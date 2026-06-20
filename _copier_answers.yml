@@ -1,0 +1,50 @@
+_commit: v0.23.18
+_src_path: https://github.com/betabitplus/py-lib-starter.git
+author_email: 8123085+betabitplus@users.noreply.github.com
+author_name: betabitplus
+ci_playwright_browsers: []
+config_class_name: RedditScraperConfig
+copyright_year: '2026'
+e2e_slices:
+  - name: public-boundary
+    path: tests/reddit_scraper/e2e/public_boundary
+  - name: examples
+    path: tests/reddit_scraper/e2e/examples
+  - name: cache
+    path: tests/reddit_scraper/e2e/cache
+  - name: feeds
+    path: tests/reddit_scraper/e2e/feeds
+  - name: media
+    path: tests/reddit_scraper/e2e/media
+  - name: post-details
+    path: tests/reddit_scraper/e2e/post_details
+  - name: retry
+    path: tests/reddit_scraper/e2e/retry
+  - name: search
+    path: tests/reddit_scraper/e2e/search
+  - name: subreddit-posts
+    path: tests/reddit_scraper/e2e/subreddit_posts
+  - name: user-data
+    path: tests/reddit_scraper/e2e/user_data
+env_file_default: $HOME/researcher-local/.env
+env_prefix: REDDIT_SCRAPER
+error_class_name: RedditScraperError
+github_owner: betabitplus
+gitignore_extra_patterns: []
+initial_version: 0.2.0
+library_lane: standard-lib
+package_name: reddit_scraper
+project_description: Standalone Reddit scraping library with replay-tested search,
+  feeds, post, user, cache, retry, and media flows.
+project_name: reddit-scraper
+project_slug: reddit-scraper
+project_title: Reddit Scraper
+project_title_lower: reddit scraper
+renovate_uv_ignored_updates: []
+repository_name: reddit_scraper
+runtime_git_ref: v0.23.18
+runtime_git_subdirectory: packages/py-lib-runtime
+runtime_git_url: https://github.com/betabitplus/py-lib-starter.git
+tooling_git_ref: v0.23.18
+tooling_git_subdirectory: packages/py-lib-tooling
+tooling_git_url: https://github.com/betabitplus/py-lib-starter.git

@@ -1,0 +1,10 @@
+{
+  "abort_direct_downloads": 1,
+  "abort_downloaded": true,
+  "abort_proxy_aborts": 0,
+  "cache_first_downloaded": true,
+  "cache_hits": 1,
+  "cache_second_downloaded": true,
+  "media_enabled_default": false,
+  "stats_keys_present": true
+}

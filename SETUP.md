@@ -1,0 +1,55 @@
+# Setup
+
+Use this file to provision a local contributor environment. For day-to-day
+workflow, tests, hooks, and release conventions, use
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Prerequisites
+
+- Python 3.13+
+- `uv` installed
+- optional local secrets/config file at the path configured by
+  `[tool.py_lib_starter].env_file_default`, or an override through the
+  repo-specific `*_ENV_FILE` variable
+
+## First-Time Setup
+
+Run this from the repository root:
+
+```bash
+bash scripts/env/setup.sh
+direnv allow
+bash scripts/env/doctor.sh
+```
+
+`scripts/env/setup.sh` runs `uv sync --group dev` and installs configured git
+hook types. `direnv allow` lets `.envrc` activate the local environment.
+`scripts/env/doctor.sh` checks common local setup problems.
+
+## Running Through Direnv
+
+If a shell has not loaded `.envrc`, run repo commands through `direnv exec .`:
+
+```bash
+direnv exec . uv run pytest tests/reddit_scraper -m hermetic -q
+direnv exec . uv run py-lib-smoke-public-api
+```
+
+## Devcontainer
+
+The devcontainer provisions an in-container `.venv` with `uv sync --group dev`.
+VS Code points to `${workspaceFolder}/.venv/bin/python` inside the container.
+
+If VS Code loses the interpreter, run `Python: Clear Workspace Interpreter Setting`
+and reselect `reddit-scraper (.venv)`.
+
+## Clean Rebuild With Uv
+
+```bash
+rm -rf .venv
+rm -f uv.lock
+uv cache clean
+uv cache prune
+uv lock
+uv sync --group dev
+```

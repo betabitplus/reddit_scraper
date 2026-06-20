@@ -1,0 +1,60 @@
+name: Setup Dev Env
+description: Set up Python, uv, and project dev dependencies.
+
+inputs:
+  python-version:
+    description: Python version to install
+    required: false
+    default: "3.13"
+  shared-package-token:
+    description: Token used to read private shared py-lib Git sources.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v8.2.0
+      with:
+        enable-cache: auto
+
+    - name: Install Linux runtime libraries
+      shell: bash
+      run: |
+        missing=()
+        dpkg-query -W libgl1 >/dev/null 2>&1 || missing+=(libgl1)
+        if ! dpkg-query -W libglib2.0-0 >/dev/null 2>&1 &&
+           ! dpkg-query -W libglib2.0-0t64 >/dev/null 2>&1; then
+          missing+=(libglib2.0-0)
+        fi
+        if [ "${#missing[@]}" -gt 0 ]; then
+          sudo apt-get update
+          sudo apt-get install -y "${missing[@]}"
+        fi
+
+    - name: Export shared py-lib Git access
+      shell: bash
+      env:
+        SHARED_PACKAGE_TOKEN: ${{ inputs.shared-package-token }}
+      run: |
+        if [ -n "${SHARED_PACKAGE_TOKEN}" ]; then
+          auth_header="$(printf 'x-access-token:%s' "${SHARED_PACKAGE_TOKEN}" | base64 | tr -d '\n')"
+          printf '::add-mask::%s\n' "${auth_header}"
+          {
+            printf 'GIT_CONFIG_COUNT=1\n'
+            printf 'GIT_CONFIG_KEY_0=http.https://github.com/.extraheader\n'
+            printf 'GIT_CONFIG_VALUE_0=AUTHORIZATION: basic %s\n' "${auth_header}"
+          } >> "${GITHUB_ENV}"
+        fi
+
+    - name: Install dependencies (dev)
+      shell: bash
+      run: |
+        python_path="$(command -v python)"
+        uv sync --group dev --frozen --python "${python_path}"

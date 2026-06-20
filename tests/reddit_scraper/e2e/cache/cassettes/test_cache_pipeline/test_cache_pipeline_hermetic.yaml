@@ -1,0 +1,157 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Host:
+      - www.reddit.com
+      User-Agent:
+      - Mozilla/5.0 (iPhone; CPU iPhone OS 18_3_2 like Mac OS X) AppleWebKit/605.1.15
+        (KHTML, like Gecko) Version/18.3.1 Mobile/15E148 Safari/604.1
+    method: GET
+    uri: https://www.reddit.com/search.json?q=python+programming&limit=3&sort=relevance&type=link
+  response:
+    body:
+      string: !!binary |
+        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
+        N+pZL178GwqyKvp5RAAA
+    headers:
+      Accept-Ranges:
+      - bytes
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '4404'
+      Date:
+      - Tue, 05 May 2026 12:53:45 GMT
+      NEL:
+      - '{"report_to": "w3-reporting-nel", "max_age": 14400, "include_subdomains":
+        false, "success_fraction": 1.0, "failure_fraction": 1.0}'
+      Report-To:
+      - '{"group": "w3-reporting-nel", "max_age": 14400, "include_subdomains": true,  "endpoints":
+        [{ "url": "https://w3-reporting-nel.reddit.com/reports" }]}, {"group": "w3-reporting",
+        "max_age": 14400, "include_subdomains": true, "endpoints": [{ "url": "https://w3-reporting.reddit.com/reports"
+        }]}, {"group": "w3-reporting-csp", "max_age": 14400, "include_subdomains":
+        true, "endpoints": [{ "url": "https://w3-reporting-csp.reddit.com/reports"
+        }]}'
+      Server:
+      - snooserv
+      Strict-Transport-Security:
+      - max-age=31536000; includeSubdomains
+      Vary:
+      - accept-encoding
+      Via:
+      - 1.1 varnish
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - SAMEORIGIN
+      X-XSS-Protection:
+      - 1; mode=block
+      access-control-allow-origin:
+      - '*'
+      access-control-expose-headers:
+      - X-Moose
+      cache-control:
+      - private, s-maxage=0, max-age=0, must-revalidate, no-store
+      content-encoding:
+      - gzip
+      content-type:
+      - application/json; charset=UTF-8
+      expires:
+      - '-1'
+      server-timing:
+      - reddit-ct;desc="dn=FT,p=FRA,cs=MISS"
+      x-ratelimit-remaining:
+      - '92.0'
+      x-ratelimit-reset:
+      - '374'
+      x-ratelimit-used:
+      - '8'
+      x-ua-compatible:
+      - IE=edge
+    status:
+      code: 200
+      message: OK
+version: 1

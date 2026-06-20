@@ -1,0 +1,286 @@
+# Keep generated repositories on the latest py-lib-starter release.
+#
+# Triggered automatically by py-lib-starter after release, and manually when a
+# maintainer wants to force a strict sync.
+
+name: Sync Starter Template
+
+on:
+  repository_dispatch:
+    types: [py-lib-starter-release]
+  workflow_dispatch:
+    inputs:
+      starter_ref:
+        description: py-lib-starter version tag to apply. Empty uses the latest release.
+        required: false
+        default: ""
+      open_pull_request:
+        description: Open a dev -> main PR after pushing the sync commit.
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: sync-starter-template
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  sync:
+    name: Sync starter template
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["self-hosted","linux","arm64"]') }}
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Require automation token
+        env:
+          AUTOMATION_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${AUTOMATION_TOKEN}" ]; then
+            echo "::error::PAT_TOKEN is required so the sync commit triggers CI and can open or update PRs."
+            exit 1
+          fi
+
+      - name: Checkout dev
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: dev
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Set up dev environment
+        uses: ./.github/actions/setup-dev-env
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          shared-package-token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Apply starter template update
+        id: sync
+        env:
+          STARTER_REF_INPUT: ${{ inputs.starter_ref }}
+          STARTER_REF_PAYLOAD: ${{ github.event.client_payload.starter_ref }}
+          ROOT_BUMPED: ${{ github.event.client_payload.root_bumped }}
+          ROOT_REF: ${{ github.event.client_payload.root_ref }}
+          ROOT_VERSION: ${{ github.event.client_payload.root_version }}
+          RUNTIME_BUMPED: ${{ github.event.client_payload.runtime_bumped }}
+          RUNTIME_VERSION: ${{ github.event.client_payload.runtime_version }}
+          TOOLING_BUMPED: ${{ github.event.client_payload.tooling_bumped }}
+          TOOLING_VERSION: ${{ github.event.client_payload.tooling_version }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin dev
+          git checkout -B dev origin/dev
+
+          starter_ref="${STARTER_REF_PAYLOAD:-${ROOT_REF:-${STARTER_REF_INPUT:-}}}"
+          sync_label="${ROOT_VERSION:-${RUNTIME_VERSION:-${TOOLING_VERSION:-${starter_ref:-latest}}}}"
+          if [[ "${sync_label}" =~ ^[0-9a-f]{40}$ ]]; then
+            sync_label="${sync_label:0:12}"
+          fi
+
+          echo "starter_ref=${starter_ref:-latest}" >> "$GITHUB_OUTPUT"
+          echo "sync_label=${sync_label}" >> "$GITHUB_OUTPUT"
+
+          tooling_source="py-lib-tooling @ git+https://github.com/betabitplus/py-lib-starter.git@${starter_ref:-v0.23.18}#subdirectory=packages/py-lib-tooling"
+
+          run_tooling_command() {
+            local command_name="$1"
+            shift
+
+            if [ -n "${starter_ref}" ]; then
+              uvx --from "${tooling_source}" "${command_name}" "$@"
+              return
+            fi
+
+            uv run "${command_name}" "$@"
+          }
+
+          run_template_update() {
+            run_tooling_command py-lib-template-update "${update_args[@]}"
+          }
+
+          refresh_shared_lock_packages() {
+            # Keep shared lock refreshes in the workflow as a bootstrap guard after
+            # the template update has moved pyproject.toml to the new starter tag.
+            run_tooling_command py-lib-refresh-shared-lock
+          }
+
+          if [ "${GITHUB_EVENT_NAME}" = "repository_dispatch" ] && [ "${ROOT_BUMPED:-false}" != "true" ]; then
+            echo "::error::Template sync dispatch must include a root py-lib-starter v* tag."
+            exit 1
+          fi
+
+          update_args=()
+          if [ -n "${starter_ref}" ]; then
+            update_args+=(--vcs-ref "${starter_ref}")
+          fi
+          run_template_update
+          refresh_shared_lock_packages
+
+          uv lock
+          uv run py-lib-template-check
+          uv lock --check
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Template already up to date."
+            exit 0
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push sync
+        if: steps.sync.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+
+          git add -A
+          if git diff --cached --name-only -- .github/workflows | grep -q .; then
+            echo "::notice::This sync changes workflow files; PAT_TOKEN must include workflow read/write permission."
+          fi
+          git commit -m "chore: sync starter template ${{ steps.sync.outputs.sync_label }}"
+          git push origin dev
+
+      - name: Ensure dev to main PR exists
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          OPEN_PULL_REQUEST_INPUT: ${{ inputs.open_pull_request }}
+        run: |
+          set -euo pipefail
+
+          read_answers_value() {
+            local answers_file="$1"
+            local key="$2"
+
+            uv run py-lib-template-answer --answers-file "${answers_file}" "${key}"
+          }
+
+          write_markdown_file_list() {
+            local files="$1"
+
+            if [ -z "${files}" ]; then
+              printf '%s\n' '- None'
+              return
+            fi
+
+            while IFS= read -r file; do
+              [ -n "${file}" ] || continue
+              printf -- '- `%s`\n' "${file}"
+            done <<< "${files}"
+          }
+
+          old_answers_file="$(mktemp)"
+          if git show HEAD^:_copier_answers.yml > "${old_answers_file}" 2>/dev/null; then
+            old_starter_ref="$(read_answers_value "${old_answers_file}" "_commit")"
+          else
+            old_starter_ref=""
+          fi
+          rm -f "${old_answers_file}"
+
+          new_starter_ref="$(read_answers_value "_copier_answers.yml" "_commit")"
+          runtime_ref="$(read_answers_value "_copier_answers.yml" "runtime_git_ref")"
+          tooling_ref="$(read_answers_value "_copier_answers.yml" "tooling_git_ref")"
+          changed_files="$(git diff --name-only HEAD^ HEAD)"
+          template_owned_files="$(git diff --name-only HEAD^ HEAD -- \
+            .devcontainer \
+            .github \
+            .vscode \
+            scripts \
+            .editorconfig \
+            .envrc \
+            .flake8 \
+            .gitleaks.toml \
+            .markdown-link-check.json \
+            .markdownlint.yaml \
+            .mdformat.toml \
+            .pre-commit-config.yaml \
+            AGENTS.md \
+            MANIFEST.in \
+            typos.toml)"
+          release_url="https://github.com/betabitplus/py-lib-starter/releases/tag/${{ steps.sync.outputs.starter_ref }}"
+          pr_body_file="$(mktemp)"
+
+          {
+            printf '%s\n\n' 'Automated strict sync with py-lib-starter.'
+            printf '%s\n' '## Baseline'
+            printf -- '- Previous starter ref: `%s`\n' "${old_starter_ref:-unknown}"
+            printf -- '- New starter ref: `%s`\n' "${new_starter_ref:-${{ steps.sync.outputs.starter_ref }}}"
+            printf -- '- Runtime ref: `%s`\n' "${runtime_ref:-not declared}"
+            printf -- '- Tooling ref: `%s`\n' "${tooling_ref:-not declared}"
+            printf -- '- Release notes: %s\n\n' "${release_url}"
+            printf '%s\n' '## Template-Owned Changes'
+            write_markdown_file_list "${template_owned_files}"
+            printf '\n%s\n' '## All Changed Files'
+            write_markdown_file_list "${changed_files}"
+            printf '\n%s\n' '## Validation'
+            printf '%s\n' '- `py-lib-template-update` completed'
+            printf '%s\n' '- `uv lock` completed'
+            printf '%s\n' '- `py-lib-template-check` passed'
+            printf '%s\n' '- `uv lock --check` passed'
+            printf '%s\n' '- No Copier rejection files, conflict markers, or template-owned delimiter issues were accepted'
+            printf '\n%s\n' '## Local Overrides'
+            printf '%s\n' '- Project-specific additions should live under `.github/workflows/project-*.yml`, `.github/actions/project-*/**`, or `scripts/local/**`.'
+            printf '%s\n' '- Those approved paths are preserved by the starter ownership policy.'
+          } > "${pr_body_file}"
+
+          open_pull_request="${OPEN_PULL_REQUEST_INPUT:-true}"
+          if [ "${open_pull_request}" != "true" ]; then
+            echo "Skipping PR creation because open_pull_request=false."
+            exit 0
+          fi
+
+          existing_pr_url="$(gh pr list \
+            --head dev \
+            --base main \
+            --state open \
+            --json url \
+            --jq '.[0].url // ""')"
+          if [ -n "${existing_pr_url}" ]; then
+            echo "Existing dev -> main PR found: ${existing_pr_url}"
+            gh pr edit "${existing_pr_url}" \
+              --title "Sync starter template" \
+              --body-file "${pr_body_file}"
+            exit 0
+          fi
+
+          set +e
+          create_output="$(gh pr create \
+            --base main \
+            --head dev \
+            --title "Sync starter template" \
+            --body-file "${pr_body_file}" 2>&1)"
+          create_status=$?
+          set -e
+
+          if [ "${create_status}" -eq 0 ]; then
+            printf '%s\n' "${create_output}"
+            exit 0
+          fi
+
+          printf '%s\n' "${create_output}"
+          existing_pr_url="$(gh pr list \
+            --head dev \
+            --base main \
+            --state open \
+            --json url \
+            --jq '.[0].url // ""')"
+          if [ -n "${existing_pr_url}" ]; then
+            echo "Existing dev -> main PR found after create retry: ${existing_pr_url}"
+            exit 0
+          fi
+
+          exit "${create_status}"

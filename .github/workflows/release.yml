@@ -1,0 +1,177 @@
+# Automated version bump and changelog generation on merge to main
+# Uses Commitizen to analyze conventional commits and determine version bump
+#
+# Trigger: Push to main (typically via merged PR)
+# Actions: Bump version in pyproject.toml, update CHANGELOG.md, create git tag,
+# create GitHub Release, and synchronize dev with the final main commit.
+
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bump-version:
+    name: Bump version and create release
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["self-hosted","linux","arm64"]') }}
+    # Skip if commit message already contains version bump (avoid infinite loop)
+    if: "!startsWith(github.event.head_commit.message, 'bump:')"
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # Full history for changelog generation
+          token: ${{ secrets.PAT_TOKEN || github.token }}
+
+      - name: Set up dev environment
+        uses: ./.github/actions/setup-dev-env
+        with:
+          python-version: "3.13"
+          shared-package-token: ${{ secrets.PY_LIB_PRIVATE_GIT_TOKEN || secrets.PAT_TOKEN || github.token }}
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Bump version and update changelog
+        id: cz
+        run: |
+          set -euo pipefail
+
+          cz() {
+            uv run cz "$@"
+          }
+
+          # Get current version before bump
+          CURRENT_VERSION=$(cz version --project)
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+
+          set +e
+          DRY_RUN_OUTPUT=$(cz bump --changelog --dry-run --yes 2>&1)
+          DRY_RUN_STATUS=$?
+          set -e
+
+          printf '%s\n' "$DRY_RUN_OUTPUT"
+
+          if [ "$DRY_RUN_STATUS" -eq 0 ]; then
+            cz bump --changelog --yes
+            NEW_VERSION=$(cz version --project)
+            echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+          elif [ "$DRY_RUN_STATUS" -eq 3 ] || [ "$DRY_RUN_STATUS" -eq 21 ]; then
+            echo "No version bump needed (no feat/fix commits since last release)"
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Commitizen bump dry-run failed with exit code $DRY_RUN_STATUS" >&2
+            exit "$DRY_RUN_STATUS"
+          fi
+
+      - name: Validate release bump scope
+        if: steps.cz.outputs.bumped == 'true'
+        run: |
+          set -euo pipefail
+
+          git diff --check HEAD^ HEAD
+          if ! git diff --quiet; then
+            git diff --check
+          fi
+
+          changed_files="$(
+            {
+              git diff --name-only HEAD^ HEAD
+              git diff --name-only
+            } | sort -u
+          )"
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            case "$path" in
+              CHANGELOG.md|pyproject.toml|uv.lock) ;;
+              *)
+                echo "Release bump modified unapproved path: $path" >&2
+                echo "Only CHANGELOG.md, pyproject.toml, and uv.lock may change during generated release bumps." >&2
+                exit 1
+                ;;
+            esac
+          done <<< "$changed_files"
+
+      - name: Push changes and tags
+        if: steps.cz.outputs.bumped == 'true'
+        run: |
+          # Use checkout credentials for repository writes, not dependency-read credentials.
+          unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
+          git push origin main --follow-tags
+
+      - name: Create GitHub Release
+        if: steps.cz.outputs.bumped == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.cz.outputs.new_version }}
+          name: Release v${{ steps.cz.outputs.new_version }}
+          body_path: CHANGELOG.md
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
+
+      - name: Synchronize dev with main
+        run: |
+          set -euo pipefail
+
+          # Use checkout credentials for repository writes, not dependency-read credentials.
+          unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
+
+          git fetch origin main
+          main_sha="$(git rev-parse origin/main)"
+
+          if git ls-remote --exit-code --heads origin dev >/dev/null; then
+            git fetch origin dev
+            dev_sha="$(git rev-parse origin/dev)"
+
+            if [ "${dev_sha}" = "${main_sha}" ]; then
+              echo "origin/dev already matches origin/main."
+              exit 0
+            fi
+
+            if git merge-base --is-ancestor "${dev_sha}" "${main_sha}"; then
+              git push origin "${main_sha}:refs/heads/dev"
+              exit 0
+            fi
+
+            represented_main_sha="${main_sha}"
+            main_subject="$(git log -1 --format=%s "${main_sha}")"
+            if [ "${main_subject#bump:}" != "${main_subject}" ]; then
+              represented_main_sha="${main_sha}^"
+            fi
+
+            if [ "$(git rev-parse "${represented_main_sha}^{tree}")" = "$(git rev-parse "${dev_sha}^{tree}")" ]; then
+              echo "origin/dev tree matches ${represented_main_sha}; moving dev to final main with an exact lease."
+              git push origin "${main_sha}:refs/heads/dev" \
+                --force-with-lease="refs/heads/dev:${dev_sha}"
+              exit 0
+            fi
+
+            dev_unique_commits="$(
+              git log --right-only --cherry-pick --oneline "${main_sha}...${dev_sha}"
+            )"
+            if [ -n "${dev_unique_commits}" ]; then
+              echo "origin/dev contains commits not represented on origin/main; refusing to move dev." >&2
+              printf '%s\n' "${dev_unique_commits}" >&2
+              exit 1
+            fi
+
+            echo "origin/dev contains only patch-equivalent rebased commits; moving dev to main with an exact lease."
+            git push origin "${main_sha}:refs/heads/dev" \
+              --force-with-lease="refs/heads/dev:${dev_sha}"
+          else
+            git push origin "${main_sha}:refs/heads/dev"
+          fi
