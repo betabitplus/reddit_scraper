@@ -64,8 +64,67 @@ jobs:
 
           printf '%s\n' "$DRY_RUN_OUTPUT"
 
+          initial_release_without_prior_tag() {
+            local status="$1"
+            local output="$2"
+
+            if [ "$status" -ne 16 ]; then
+              return 1
+            fi
+            if ! grep -q '^tag to create:' <<<"$output"; then
+              return 1
+            fi
+            if ! grep -q '^No tag found to do an incremental changelog$' <<<"$output"; then
+              return 1
+            fi
+
+            return 0
+          }
+
+          bump_without_changelog_update() {
+            python3 <<'PY'
+          from pathlib import Path
+
+          path = Path("pyproject.toml")
+          text = path.read_text(encoding="utf-8")
+          old = "update_changelog_on_bump = true"
+          if old not in text:
+              raise SystemExit("Missing Commitizen changelog setting")
+          path.write_text(
+              text.replace(old, "update_changelog_on_bump = false", 1),
+              encoding="utf-8",
+          )
+          PY
+
+            set +e
+            cz bump --yes
+            bump_status=$?
+            set -e
+
+            python3 <<'PY'
+          from pathlib import Path
+
+          path = Path("pyproject.toml")
+          text = path.read_text(encoding="utf-8")
+          old = "update_changelog_on_bump = false"
+          if old not in text:
+              raise SystemExit("Missing temporary Commitizen changelog setting")
+          path.write_text(
+              text.replace(old, "update_changelog_on_bump = true", 1),
+              encoding="utf-8",
+          )
+          PY
+
+            return "$bump_status"
+          }
+
           if [ "$DRY_RUN_STATUS" -eq 0 ]; then
             cz bump --changelog --yes
+            NEW_VERSION=$(cz version --project)
+            echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+          elif initial_release_without_prior_tag "$DRY_RUN_STATUS" "$DRY_RUN_OUTPUT"; then
+            bump_without_changelog_update
             NEW_VERSION=$(cz version --project)
             echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
             echo "bumped=true" >> "$GITHUB_OUTPUT"
