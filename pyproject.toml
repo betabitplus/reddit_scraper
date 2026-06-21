@@ -405,7 +405,7 @@ annotated_tag = true
 # Changelog configuration
 changelog_file = "CHANGELOG.md"
 changelog_incremental = true
-update_changelog_on_bump = false
+update_changelog_on_bump = true
 
 # ---------------- Shared py-lib tooling manifest ----------------
 [tool.py_lib_starter]

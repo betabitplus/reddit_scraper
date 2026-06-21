@@ -115,6 +115,14 @@ jobs:
           )
           PY
 
+            if [ "$bump_status" -eq 0 ]; then
+              tag_name="v$(cz version --project)"
+              git add pyproject.toml uv.lock
+              git commit --amend --no-edit
+              git tag -d "$tag_name"
+              git tag -a "$tag_name" -m "$tag_name"
+            fi
+
             return "$bump_status"
           }
 
