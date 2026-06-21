@@ -10,7 +10,7 @@ requires = [ "setuptools>=82.0.1" ]
 # ==============================================================================
 [project]
 name = "reddit-scraper"
-version = "0.2.4"
+version = "0.2.5"
 description = "Standalone Reddit scraping library with replay-tested search, feeds, post, user, cache, retry, and media flows."
 readme = "README.md"
 keywords = [ "library", "python", "reddit", "scraper" ]
@@ -405,7 +405,7 @@ annotated_tag = true
 # Changelog configuration
 changelog_file = "CHANGELOG.md"
 changelog_incremental = true
-update_changelog_on_bump = true
+update_changelog_on_bump = false
 
 # ---------------- Shared py-lib tooling manifest ----------------
 [tool.py_lib_starter]
