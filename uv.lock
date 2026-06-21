@@ -1353,7 +1353,7 @@ wheels = [
 [[package]]
 name = "py-lib-runtime"
 version = "0.10.3"
-source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-runtime&rev=v0.24.2#91850faa75e44a0fbe479d0a7fcf2fac97e81d5b" }
+source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-runtime&rev=v0.24.2#aa1e4462181bb8dcb75cab38cf3c218b471ee494" }
 dependencies = [
     { name = "structlog" },
 ]
@@ -1361,7 +1361,7 @@ dependencies = [
 [[package]]
 name = "py-lib-tooling"
 version = "0.22.0"
-source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-tooling&rev=v0.24.2#91850faa75e44a0fbe479d0a7fcf2fac97e81d5b" }
+source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-tooling&rev=v0.24.2#aa1e4462181bb8dcb75cab38cf3c218b471ee494" }
 dependencies = [
     { name = "copier" },
     { name = "ipython" },
