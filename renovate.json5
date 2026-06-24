@@ -8,7 +8,7 @@
   semanticCommits: "enabled",
   semanticCommitType: "chore",
   semanticCommitScope: "deps",
-  enabledManagers: ["github-actions", "pep621", "pre-commit"],
+  enabledManagers: ["github-actions", "pep621"],
   pep621: {
     managerFilePatterns: ["/^pyproject\\.toml$/"],
   },

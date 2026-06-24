@@ -48,7 +48,7 @@ jobs:
   baseline:
     needs: main-pr-source-policy
     name: Baseline Repo Verification
-    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-baseline.yml@v0.25.1
+    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-baseline.yml@v0.25.3
     with:
       python-version: "3.13"
     secrets: inherit
@@ -56,7 +56,7 @@ jobs:
   package:
     needs: main-pr-source-policy
     name: Package Verification
-    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-package.yml@v0.25.1
+    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-package.yml@v0.25.3
     with:
       python-version: "3.13"
     secrets: inherit
@@ -64,7 +64,7 @@ jobs:
   e2e-slices:
     needs: main-pr-source-policy
     name: E2E Slice (${{ matrix.name }})
-    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-e2e-slice.yml@v0.25.1
+    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-e2e-slice.yml@v0.25.3
     strategy:
       fail-fast: false
       matrix:
