@@ -1,8 +1,14 @@
 # Pre-commit hooks configuration
-# Install all hook types:
-#   pre-commit install -t pre-commit -t pre-push -t commit-msg -t post-merge -t post-checkout -t post-rewrite
+# Install configured hook stages: pre-commit install
 # Run manually: pre-commit run --all-files
 # Update hooks: pre-commit autoupdate
+
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+  - commit-msg
+  - post-merge
+  - post-checkout
 
 # Stop on first failure to avoid wasting time on subsequent hooks
 fail_fast: true
@@ -484,11 +490,3 @@ repos:
         args: [tests, -n, auto, -p, randomly, -m, "not slow", -q, --no-cov]
         files: ^(src/|tests/|examples/)
         stages: [pre-push]
-
-# =============================================================================
-# CI Configuration
-# =============================================================================
-ci:
-  # Skip hooks that need local environment or are slow
-  skip: [pyright, radon-cc, radon-mi, py-lib-check-cognitive-complexity, py-lib-check-class-attributes-order, check-manifest, deptry]
-  autoupdate_schedule: monthly

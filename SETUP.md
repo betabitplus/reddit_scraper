@@ -26,6 +26,12 @@ bash scripts/env/doctor.sh
 hook types. `direnv allow` lets `.envrc` activate the local environment.
 `scripts/env/doctor.sh` checks common local setup problems.
 
+To install or refresh all configured hook stages directly, run:
+
+```bash
+uv run pre-commit install
+```
+
 ## Running Through Direnv
 
 If a shell has not loaded `.envrc`, run repo commands through `direnv exec .`:

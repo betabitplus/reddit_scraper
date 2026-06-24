@@ -8,7 +8,7 @@
   semanticCommits: "enabled",
   semanticCommitType: "chore",
   semanticCommitScope: "deps",
-  enabledManagers: ["github-actions", "pep621", "pre-commit"],
+  enabledManagers: ["github-actions", "pep621"],
   pep621: {
     managerFilePatterns: ["/^pyproject\\.toml$/"],
   },
@@ -58,7 +58,7 @@
       enabled: false,
     },
     {
-      description: "Starter-owned repository automation is updated by py-lib-starter template syncs.",
+      description: 'Starter-owned repository automation is updated by py-lib-starter template syncs. Historical manager set: enabledManagers: ["github-actions", "pep621", "pre-commit"]',
       matchManagers: ["github-actions", "pre-commit"],
       matchFileNames: [
         ".github/actions/**",

@@ -1353,15 +1353,15 @@ wheels = [
 [[package]]
 name = "py-lib-runtime"
 version = "0.10.3"
-source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-runtime&rev=v0.25.1#62c5d9f3e74ede08cd8b431ccb3628126f0896a5" }
+source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-runtime&rev=v0.25.2#0778e7f3216ea2527e5328e1d4a3dc0e34372413" }
 dependencies = [
     { name = "structlog" },
 ]
 
 [[package]]
 name = "py-lib-tooling"
-version = "0.23.0"
-source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-tooling&rev=v0.25.1#62c5d9f3e74ede08cd8b431ccb3628126f0896a5" }
+version = "0.23.1"
+source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-tooling&rev=v0.25.2#0778e7f3216ea2527e5328e1d4a3dc0e34372413" }
 dependencies = [
     { name = "copier" },
     { name = "ipython" },
@@ -1818,7 +1818,7 @@ requires-dist = [
     { name = "diskcache", specifier = ">=5.6.3" },
     { name = "fake-useragent" },
     { name = "httpx" },
-    { name = "py-lib-runtime", git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-runtime&rev=v0.25.1" },
+    { name = "py-lib-runtime", git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-runtime&rev=v0.25.2" },
     { name = "tenacity", specifier = ">=9.1.4" },
 ]
 
@@ -1840,7 +1840,7 @@ dev = [
     { name = "pillow", specifier = ">=12.2" },
     { name = "pip-audit", specifier = ">=2.10.1" },
     { name = "pre-commit", specifier = ">=4.6.0" },
-    { name = "py-lib-tooling", git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-tooling&rev=v0.25.1" },
+    { name = "py-lib-tooling", git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-tooling&rev=v0.25.2" },
     { name = "pyright", specifier = ">=1.1.410" },
     { name = "pytest", specifier = ">=9.1.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
