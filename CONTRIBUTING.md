@@ -129,8 +129,17 @@ direnv exec . uv run py-lib-reproduce-running-loop \
 ## Commit And Release Conventions
 
 This project uses [Commitizen](https://commitizen-tools.github.io/commitizen/)
-for version management and changelog generation. Commit messages must follow
-[Conventional Commits](https://www.conventionalcommits.org/) format.
+for version management and changelog generation. Commit messages and pull
+request titles must follow [Conventional Commits](https://www.conventionalcommits.org/)
+format, for example `feat: add retry policy`, `fix(cache): preserve metadata`,
+or `chore(ci): update workflows`. Use GitHub's draft state instead of a `WIP`
+title prefix.
+
+For an aggregated `dev` to `main` pull request, choose the title according to
+the highest release impact it contains: breaking change first, then `feat`,
+then `fix`, otherwise an appropriate non-release type such as `docs` or
+`chore`. CI validates the format, while the maintainer remains responsible for
+choosing the correct semantic type.
 
 Full CI runs on `dev` pushes and on pull requests targeting `dev` or
 `main`. Pull requests targeting `main` must come from the same repository's

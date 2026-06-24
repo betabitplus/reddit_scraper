@@ -94,7 +94,7 @@ jobs:
           echo "starter_ref=${starter_ref:-latest}" >> "$GITHUB_OUTPUT"
           echo "sync_label=${sync_label}" >> "$GITHUB_OUTPUT"
 
-          tooling_source="py-lib-tooling @ git+https://github.com/betabitplus/py-lib-starter.git@${starter_ref:-v0.24.2}#subdirectory=packages/py-lib-tooling"
+          tooling_source="py-lib-tooling @ git+https://github.com/betabitplus/py-lib-starter.git@${starter_ref:-v0.25.0}#subdirectory=packages/py-lib-tooling"
 
           run_tooling_command() {
             local command_name="$1"
@@ -243,6 +243,7 @@ jobs:
             exit 0
           fi
 
+          pr_title="chore(template): sync starter template ${{ steps.sync.outputs.sync_label }}"
           existing_pr_url="$(gh pr list \
             --head dev \
             --base main \
@@ -252,7 +253,7 @@ jobs:
           if [ -n "${existing_pr_url}" ]; then
             echo "Existing dev -> main PR found: ${existing_pr_url}"
             gh pr edit "${existing_pr_url}" \
-              --title "Sync starter template" \
+              --title "${pr_title}" \
               --body-file "${pr_body_file}"
             exit 0
           fi
@@ -261,7 +262,7 @@ jobs:
           create_output="$(gh pr create \
             --base main \
             --head dev \
-            --title "Sync starter template" \
+            --title "${pr_title}" \
             --body-file "${pr_body_file}" 2>&1)"
           create_status=$?
           set -e
