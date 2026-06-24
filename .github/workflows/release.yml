@@ -39,6 +39,14 @@ jobs:
           python-version: "3.13"
           shared-package-token: ${{ secrets.PY_LIB_PRIVATE_GIT_TOKEN || secrets.PAT_TOKEN || github.token }}
 
+      - name: Validate main commit subject
+        run: |
+          set -euo pipefail
+          main_subject="$(git log -1 --format=%s)"
+          uv run python -m \
+            py_lib_tooling._internal.quality_gates.change_title \
+            "$main_subject"
+
       - name: Configure Git
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
