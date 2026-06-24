@@ -58,7 +58,7 @@
       enabled: false,
     },
     {
-      description: 'Starter-owned repository automation is updated by py-lib-starter template syncs. Historical manager set: enabledManagers: ["github-actions", "pep621", "pre-commit"]',
+      description: "Starter-owned repository automation is updated by py-lib-starter template syncs.",
       matchManagers: ["github-actions", "pre-commit"],
       matchFileNames: [
         ".github/actions/**",
