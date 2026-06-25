@@ -19,52 +19,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  main-pr-source-policy:
-    name: Main PR Source Policy
-    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["self-hosted","linux","arm64"]') }}
-    permissions:
-      contents: read
-
-    steps:
-      - name: Enforce main PR source repository and branch
-        if: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' }}
-        env:
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-          BASE_REPOSITORY: ${{ github.repository }}
-          HEAD_BRANCH: ${{ github.head_ref }}
-        run: |
-          set -euo pipefail
-          if [ "${HEAD_REPOSITORY}" != "${BASE_REPOSITORY}" ] || [ "${HEAD_BRANCH}" != "dev" ]; then
-            echo "Only the same repository's dev branch may open pull requests to main." >&2
-            echo "Saw source repository: ${HEAD_REPOSITORY}" >&2
-            echo "Saw target repository: ${BASE_REPOSITORY}" >&2
-            echo "Saw source branch: ${HEAD_BRANCH}" >&2
-            exit 1
-          fi
-
-      - name: Accept CI event routing
-        run: echo "CI event routing accepted."
-
   baseline:
-    needs: main-pr-source-policy
     name: Baseline Repo Verification
-    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-baseline.yml@v0.25.3
+    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-baseline.yml@v0.25.4
     with:
       python-version: "3.13"
     secrets: inherit
 
   package:
-    needs: main-pr-source-policy
     name: Package Verification
-    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-package.yml@v0.25.3
+    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-package.yml@v0.25.4
     with:
       python-version: "3.13"
     secrets: inherit
 
   e2e-slices:
-    needs: main-pr-source-policy
     name: E2E Slice (${{ matrix.name }})
-    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-e2e-slice.yml@v0.25.3
+    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-e2e-slice.yml@v0.25.4
     strategy:
       fail-fast: false
       matrix:
@@ -99,7 +70,6 @@ jobs:
     name: ci/merge-gate
     runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["self-hosted","linux","arm64"]') }}
     needs:
-      - main-pr-source-policy
       - baseline
       - package
       - e2e-slices
@@ -108,19 +78,34 @@ jobs:
       contents: read
 
     steps:
-      - name: Require all CI jobs to pass
+      - name: Enforce source policy and require all CI jobs to pass
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_BRANCH: ${{ github.base_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.head_ref }}
         run: |
           set -euo pipefail
-          source_policy="${{ needs['main-pr-source-policy'].result }}"
+
+          if [ "${EVENT_NAME}" = "pull_request" ] && [ "${BASE_BRANCH}" = "main" ]; then
+            if [ "${HEAD_REPOSITORY}" != "${BASE_REPOSITORY}" ] || [ "${HEAD_BRANCH}" != "dev" ]; then
+              echo "Only the same repository's dev branch may open pull requests to main." >&2
+              echo "Saw source repository: ${HEAD_REPOSITORY}" >&2
+              echo "Saw target repository: ${BASE_REPOSITORY}" >&2
+              echo "Saw source branch: ${HEAD_BRANCH}" >&2
+              exit 1
+            fi
+          fi
+
           baseline="${{ needs.baseline.result }}"
           package="${{ needs.package.result }}"
           e2e_slices="${{ needs['e2e-slices'].result }}"
 
-          if [ "${source_policy}" != "success" ] ||
-             [ "${baseline}" != "success" ] ||
+          if [ "${baseline}" != "success" ] ||
              [ "${package}" != "success" ] ||
              [ "${e2e_slices}" != "success" ]; then
-            printf 'CI job results: main-pr-source-policy=%s baseline=%s package=%s e2e-slices=%s\n' \
-              "${source_policy}" "${baseline}" "${package}" "${e2e_slices}" >&2
+            printf 'CI job results: baseline=%s package=%s e2e-slices=%s\n' \
+              "${baseline}" "${package}" "${e2e_slices}" >&2
             exit 1
           fi
