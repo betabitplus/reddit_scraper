@@ -94,7 +94,7 @@ jobs:
           echo "starter_ref=${starter_ref:-latest}" >> "$GITHUB_OUTPUT"
           echo "sync_label=${sync_label}" >> "$GITHUB_OUTPUT"
 
-          tooling_source="py-lib-tooling @ git+https://github.com/betabitplus/py-lib-starter.git@${starter_ref:-v0.25.4}#subdirectory=packages/py-lib-tooling"
+          tooling_source="py-lib-tooling @ git+https://github.com/betabitplus/py-lib-starter.git@${starter_ref:-v0.25.5}#subdirectory=packages/py-lib-tooling"
 
           run_tooling_command() {
             local command_name="$1"
@@ -169,20 +169,6 @@ jobs:
             uv run py-lib-template-answer --answers-file "${answers_file}" "${key}"
           }
 
-          write_markdown_file_list() {
-            local files="$1"
-
-            if [ -z "${files}" ]; then
-              printf '%s\n' '- None'
-              return
-            fi
-
-            while IFS= read -r file; do
-              [ -n "${file}" ] || continue
-              printf -- '- `%s`\n' "${file}"
-            done <<< "${files}"
-          }
-
           old_answers_file="$(mktemp)"
           if git show HEAD^:_copier_answers.yml > "${old_answers_file}" 2>/dev/null; then
             old_starter_ref="$(read_answers_value "${old_answers_file}" "_commit")"
@@ -194,23 +180,6 @@ jobs:
           new_starter_ref="$(read_answers_value "_copier_answers.yml" "_commit")"
           runtime_ref="$(read_answers_value "_copier_answers.yml" "runtime_git_ref")"
           tooling_ref="$(read_answers_value "_copier_answers.yml" "tooling_git_ref")"
-          changed_files="$(git diff --name-only HEAD^ HEAD)"
-          template_owned_files="$(git diff --name-only HEAD^ HEAD -- \
-            .devcontainer \
-            .github \
-            .vscode \
-            scripts \
-            .editorconfig \
-            .envrc \
-            .flake8 \
-            .gitleaks.toml \
-            .markdown-link-check.json \
-            .markdownlint.yaml \
-            .mdformat.toml \
-            .pre-commit-config.yaml \
-            AGENTS.md \
-            MANIFEST.in \
-            typos.toml)"
           release_url="https://github.com/betabitplus/py-lib-starter/releases/tag/${{ steps.sync.outputs.starter_ref }}"
           pr_body_file="$(mktemp)"
 
@@ -222,19 +191,8 @@ jobs:
             printf -- '- Runtime ref: `%s`\n' "${runtime_ref:-not declared}"
             printf -- '- Tooling ref: `%s`\n' "${tooling_ref:-not declared}"
             printf -- '- Release notes: %s\n\n' "${release_url}"
-            printf '%s\n' '## Template-Owned Changes'
-            write_markdown_file_list "${template_owned_files}"
-            printf '\n%s\n' '## All Changed Files'
-            write_markdown_file_list "${changed_files}"
-            printf '\n%s\n' '## Validation'
-            printf '%s\n' '- `py-lib-template-update` completed'
-            printf '%s\n' '- `uv lock` completed'
-            printf '%s\n' '- `py-lib-template-check` passed'
-            printf '%s\n' '- `uv lock --check` passed'
-            printf '%s\n' '- No Copier rejection files, conflict markers, or template-owned delimiter issues were accepted'
-            printf '\n%s\n' '## Local Overrides'
-            printf '%s\n' '- Project-specific additions should live under `.github/workflows/project-*.yml`, `.github/actions/project-*/**`, or `scripts/local/**`.'
-            printf '%s\n' '- Those approved paths are preserved by the starter ownership policy.'
+            printf '%s\n' '## Validation'
+            printf '%s\n' '- Template update, lock refresh, and validation completed successfully.'
           } > "${pr_body_file}"
 
           open_pull_request="${OPEN_PULL_REQUEST_INPUT:-true}"

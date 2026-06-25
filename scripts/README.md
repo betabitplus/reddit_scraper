@@ -40,8 +40,6 @@ env_file_default = project_config.env_file_default
   Local contributor environment setup and health checks. `project_config.sh`
   reads `[tool.py_lib_starter]` from `pyproject.toml` for `.envrc` and
   `env/doctor.sh`.
-- `ci/`
-  Optional `act` entrypoints for terminal-only GitHub workflow debugging.
 
 Use shared smoke commands directly:
 
@@ -49,15 +47,6 @@ Use shared smoke commands directly:
 uv run py-lib-smoke-installed-artifact
 uv run py-lib-smoke-public-api
 ```
-
-Run the GitHub CI workflow locally with:
-
-```bash
-scripts/ci/local_ci.sh
-```
-
-This is a debug dry run. Protected merges are gated by the GitHub Actions
-`ci/merge-gate` job on the configured runner backend.
 
 Check and apply starter template and shared package updates through the shared
 commands:
