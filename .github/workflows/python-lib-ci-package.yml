@@ -78,6 +78,7 @@ jobs:
           private-key: ${{ secrets.PY_LIB_AUTOMATION_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ steps.token-scope.outputs.repositories }}
+          permission-contents: read
 
       - name: Export shared py-lib Git access
         env:

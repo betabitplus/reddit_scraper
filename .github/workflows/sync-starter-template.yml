@@ -37,7 +37,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Prepare sync token scope
+      - name: Prepare shared package token scope
         id: token-scope
         run: |
           set -euo pipefail
@@ -56,7 +56,17 @@ jobs:
           print("EOF")
           PY
 
-      - name: Create automation token
+      - name: Create sync write token
+        id: sync-write-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.PY_LIB_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.PY_LIB_AUTOMATION_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Create shared package read token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -64,6 +74,7 @@ jobs:
           private-key: ${{ secrets.PY_LIB_AUTOMATION_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ steps.token-scope.outputs.repositories }}
+          permission-contents: read
 
       - name: Verify automation access
         env:
@@ -82,7 +93,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: dev
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ steps.sync-write-token.outputs.token }}
 
       - name: Set up dev environment
         uses: ./.github/actions/setup-dev-env
@@ -127,7 +138,7 @@ jobs:
           echo "starter_ref=${starter_ref:-latest}" >> "$GITHUB_OUTPUT"
           echo "sync_label=${sync_label}" >> "$GITHUB_OUTPUT"
 
-          tooling_source="py-lib-tooling @ git+https://github.com/betabitplus/py-lib-starter.git@${starter_ref:-v0.26.4}#subdirectory=packages/py-lib-tooling"
+          tooling_source="py-lib-tooling @ git+https://github.com/betabitplus/py-lib-starter.git@${starter_ref:-v0.26.5}#subdirectory=packages/py-lib-tooling"
 
           run_tooling_command() {
             local command_name="$1"
@@ -177,8 +188,16 @@ jobs:
 
       - name: Commit and push sync
         if: steps.sync.outputs.changed == 'true'
+        env:
+          SYNC_WRITE_TOKEN: ${{ steps.sync-write-token.outputs.token }}
         run: |
           set -euo pipefail
+
+          auth_header="$(printf 'x-access-token:%s' "${SYNC_WRITE_TOKEN}" | base64 | tr -d '\n')"
+          printf '::add-mask::%s\n' "${auth_header}"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth_header}"
 
           git add -A
           if git diff --cached --name-only -- .github/workflows | grep -q .; then
@@ -190,7 +209,7 @@ jobs:
       - name: Ensure dev to main PR exists
         if: steps.sync.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.sync-write-token.outputs.token }}
           OPEN_PULL_REQUEST_INPUT: ${{ inputs.open_pull_request }}
         run: |
           set -euo pipefail
