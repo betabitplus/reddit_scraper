@@ -64,6 +64,8 @@ Secret:   PY_LIB_AUTOMATION_PRIVATE_KEY private-key secret used by actions/creat
 
 Keep both variables. The App ID remains numeric for ruleset bypass; workflows use the Client ID to create installation tokens. Store the full current private-key PEM as the secret. Never commit it.
 
+This repository stores local reusable CI workflows in `.github/workflows/python-lib-ci-*.yml`. `ci.yml` calls those local files so GitHub can parse CI without reading `py-lib-starter` first. The local reusable jobs still create a scoped App token for this repository plus `py-lib-starter` before dependency installation. Do not edit the local copies by hand; starter releases and Sync Starter Template refresh them through Copier.
+
 ## 4. Protect `main`
 
 Keep the existing human path unchanged:
