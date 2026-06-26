@@ -27,12 +27,23 @@ jobs:
       contents: write
 
     steps:
-      - name: Create automation token
+      - name: Create release write token
+        id: release-write-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.PY_LIB_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.PY_LIB_AUTOMATION_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Create shared package read token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ vars.PY_LIB_AUTOMATION_CLIENT_ID }}
           private-key: ${{ secrets.PY_LIB_AUTOMATION_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }},py-lib-starter
+          permission-contents: read
 
       - name: Verify automation access
         env:
@@ -49,7 +60,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Full history for changelog generation
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ steps.release-write-token.outputs.token }}
 
       - name: Set up dev environment
         uses: ./.github/actions/setup-dev-env
@@ -219,7 +230,7 @@ jobs:
           body_path: CHANGELOG.md
           generate_release_notes: true
         env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ steps.release-write-token.outputs.token }}
 
       - name: Synchronize dev with main
         run: |
