@@ -21,21 +21,21 @@ concurrency:
 jobs:
   baseline:
     name: Baseline Repo Verification
-    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-baseline.yml@v0.26.0
+    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-baseline.yml@v0.26.2
     with:
       python-version: "3.13"
     secrets: inherit
 
   package:
     name: Package Verification
-    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-package.yml@v0.26.0
+    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-package.yml@v0.26.2
     with:
       python-version: "3.13"
     secrets: inherit
 
   e2e-slices:
     name: E2E Slice (${{ matrix.name }})
-    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-e2e-slice.yml@v0.26.0
+    uses: betabitplus/py-lib-starter/.github/workflows/python-lib-ci-e2e-slice.yml@v0.26.2
     strategy:
       fail-fast: false
       matrix:

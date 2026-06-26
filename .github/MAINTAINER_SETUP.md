@@ -34,6 +34,18 @@ permissions are approved:
 - `Pull requests: Read and write`
 - `Workflows: Read and write`
 
+`All repositories` makes the GitHub App installation available to a new
+repository, but it does not create repository Actions variables or secrets and
+does not register the repository in the managed py-lib fleet. Before enabling
+fleet workflows for a new managed repository, register it in the fleet manifest
+and run the onboarding helper from `py-lib-starter`:
+
+```bash
+scripts/platform/onboard_github_app_repository.sh \
+    betabitplus/new_repo \
+    "$HOME/.config/py-lib-platform/github-app.pem"
+```
+
 The authoritative fleet runbook is:
 
 ```text
