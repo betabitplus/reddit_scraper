@@ -37,14 +37,42 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Require automation token
-        env:
-          AUTOMATION_TOKEN: ${{ secrets.PAT_TOKEN }}
+      - name: Prepare sync token scope
+        id: token-scope
         run: |
           set -euo pipefail
+          current_repository="${GITHUB_REPOSITORY#*/}"
+          python3 - "${current_repository}" <<'PY' >> "${GITHUB_OUTPUT}"
+          import sys
 
-          if [ -z "${AUTOMATION_TOKEN}" ]; then
-            echo "::error::PAT_TOKEN is required so the sync commit triggers CI and can open or update PRs."
+          seen = set()
+          repositories = []
+          for repository in (sys.argv[1], "py-lib-starter"):
+              if repository not in seen:
+                  repositories.append(repository)
+                  seen.add(repository)
+          print("repositories<<EOF")
+          print("\n".join(repositories))
+          print("EOF")
+          PY
+
+      - name: Create automation token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.PY_LIB_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.PY_LIB_AUTOMATION_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ steps.token-scope.outputs.repositories }}
+
+      - name: Verify automation access
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REQUIRED_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/${REQUIRED_REPOSITORY}" >/dev/null; then
+            echo "::error::The betabitplus-py-lib-automation GitHub App cannot access ${REQUIRED_REPOSITORY}. Install or re-authorize the App for this repository."
             exit 1
           fi
 
@@ -54,18 +82,23 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: dev
-          token: ${{ secrets.PAT_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Set up dev environment
         uses: ./.github/actions/setup-dev-env
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          shared-package-token: ${{ secrets.PAT_TOKEN }}
+          shared-package-token: ${{ steps.app-token.outputs.token }}
 
-      - name: Configure Git
+      - name: Configure Git as the automation App
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          set -euo pipefail
+          app_slug="${{ steps.app-token.outputs.app-slug }}"
+          app_user_id="$(gh api "/users/${app_slug}[bot]" --jq .id)"
+          git config --local user.name "${app_slug}[bot]"
+          git config --local user.email "${app_user_id}+${app_slug}[bot]@users.noreply.github.com"
 
       - name: Apply starter template update
         id: sync
@@ -94,7 +127,7 @@ jobs:
           echo "starter_ref=${starter_ref:-latest}" >> "$GITHUB_OUTPUT"
           echo "sync_label=${sync_label}" >> "$GITHUB_OUTPUT"
 
-          tooling_source="py-lib-tooling @ git+https://github.com/betabitplus/py-lib-starter.git@${starter_ref:-v0.25.5}#subdirectory=packages/py-lib-tooling"
+          tooling_source="py-lib-tooling @ git+https://github.com/betabitplus/py-lib-starter.git@${starter_ref:-v0.26.0}#subdirectory=packages/py-lib-tooling"
 
           run_tooling_command() {
             local command_name="$1"
@@ -149,7 +182,7 @@ jobs:
 
           git add -A
           if git diff --cached --name-only -- .github/workflows | grep -q .; then
-            echo "::notice::This sync changes workflow files; PAT_TOKEN must include workflow read/write permission."
+            echo "::notice::This sync changes workflow files; betabitplus-py-lib-automation must have Workflows: read and write permission."
           fi
           git commit -m "chore: sync starter template ${{ steps.sync.outputs.sync_label }}"
           git push origin dev
@@ -157,7 +190,7 @@ jobs:
       - name: Ensure dev to main PR exists
         if: steps.sync.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           OPEN_PULL_REQUEST_INPUT: ${{ inputs.open_pull_request }}
         run: |
           set -euo pipefail
