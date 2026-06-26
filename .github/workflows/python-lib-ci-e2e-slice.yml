@@ -1,0 +1,143 @@
+# Reusable generated-library hermetic e2e slice verification.
+
+name: Python Library CI E2E Slice
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python version to install.
+        required: false
+        type: string
+        default: "3.13"
+      e2e-path:
+        description: Pytest path for one hermetic e2e slice.
+        required: true
+        type: string
+      playwright-browsers:
+        description: Space-separated Playwright browser names to install.
+        required: false
+        type: string
+        default: ""
+
+env:
+  PYTEST_XDIST_AUTO_NUM_WORKERS: "2"
+
+jobs:
+  e2e-slice:
+    name: E2E Slice
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["self-hosted","linux","arm64"]') }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: auto
+
+      - name: Install Linux runtime libraries
+        run: |
+          missing=()
+          dpkg-query -W libgl1 >/dev/null 2>&1 || missing+=(libgl1)
+          if ! dpkg-query -W libglib2.0-0 >/dev/null 2>&1 &&
+             ! dpkg-query -W libglib2.0-0t64 >/dev/null 2>&1; then
+            missing+=(libglib2.0-0)
+          fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            sudo apt-get update
+            sudo apt-get install -y "${missing[@]}"
+          fi
+
+      - name: Prepare shared package token scope
+        id: token-scope
+        run: |
+          set -euo pipefail
+          current_repository="${GITHUB_REPOSITORY#*/}"
+          python3 - "${current_repository}" <<'PY' >> "${GITHUB_OUTPUT}"
+          import sys
+
+          seen = set()
+          repositories = []
+          for repository in (sys.argv[1], "py-lib-starter"):
+              if repository not in seen:
+                  repositories.append(repository)
+                  seen.add(repository)
+          print("repositories<<EOF")
+          print("\n".join(repositories))
+          print("EOF")
+          PY
+
+      - name: Create shared package token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.PY_LIB_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.PY_LIB_AUTOMATION_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ steps.token-scope.outputs.repositories }}
+
+      - name: Export shared py-lib Git access
+        env:
+          SHARED_PACKAGE_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          auth_header="$(printf 'x-access-token:%s' "${SHARED_PACKAGE_TOKEN}" | base64 | tr -d '\n')"
+          printf '::add-mask::%s\n' "${auth_header}"
+          {
+            printf 'GIT_CONFIG_COUNT=1\n'
+            printf 'GIT_CONFIG_KEY_0=http.https://github.com/.extraheader\n'
+            printf 'GIT_CONFIG_VALUE_0=AUTHORIZATION: basic %s\n' "${auth_header}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Verify shared py-lib Git access
+        run: |
+          set -euo pipefail
+          for repository in "${GITHUB_REPOSITORY}" "betabitplus/py-lib-starter"; do
+            if ! git ls-remote "https://github.com/${repository}.git" HEAD >/dev/null 2>&1; then
+              echo "::error::The betabitplus-py-lib-automation GitHub App cannot read ${repository}. Install or re-authorize the App for that repository before dependency installation."
+              exit 1
+            fi
+          done
+
+      - name: Install dependencies (dev)
+        run: |
+          python_path="$(command -v python)"
+          uv sync --group dev --frozen --python "${python_path}"
+
+      - name: Cache Playwright browsers
+        if: inputs.playwright-browsers != ''
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ inputs.playwright-browsers }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-${{ runner.arch }}-${{ inputs.playwright-browsers }}-
+
+      - name: Install Playwright browsers
+        if: inputs.playwright-browsers != ''
+        env:
+          PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
+        run: |
+          if [ "${{ runner.environment }}" = "self-hosted" ]; then
+            uv run playwright install ${PLAYWRIGHT_BROWSERS}
+          else
+            uv run playwright install --with-deps ${PLAYWRIGHT_BROWSERS}
+          fi
+
+      - name: Run hermetic e2e slice
+        run: |
+          uv run pytest "${{ inputs.e2e-path }}" \
+            -m "not slow" \
+            -q -rs --no-cov
