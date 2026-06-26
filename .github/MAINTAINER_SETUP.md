@@ -42,8 +42,8 @@ and run the onboarding helper from `py-lib-starter`:
 
 ```bash
 scripts/platform/onboard_github_app_repository.sh \
-  betabitplus/new_repo \
-  "$HOME/.config/py-lib-platform/github-app.pem"
+    betabitplus/new_repo \
+    "$HOME/.config/py-lib-platform/github-app.pem"
 ```
 
 The authoritative fleet runbook is:
