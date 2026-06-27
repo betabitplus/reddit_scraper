@@ -69,6 +69,7 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ steps.token-scope.outputs.repositories }}
           permission-contents: read
+          skip-token-revoke: true
 
       - name: Export shared py-lib Git access
         env:

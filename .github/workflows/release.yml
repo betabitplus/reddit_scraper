@@ -1,9 +1,9 @@
-# Automated version bump and changelog generation on merge to main
-# Uses Commitizen to analyze conventional commits and determine version bump
+# Automated version bump and release creation on merge to main.
+# Uses Commitizen to analyze conventional commits and determine version bump.
 #
 # Trigger: Push to main (typically via merged PR)
-# Actions: Bump version in pyproject.toml, update CHANGELOG.md, create git tag,
-# create GitHub Release, and synchronize dev with the final main commit.
+# Actions: Bump version, update CHANGELOG.md, create a git tag and GitHub Release,
+# then synchronize dev with the final main commit.
 
 name: Release
 
@@ -34,7 +34,6 @@ jobs:
           client-id: ${{ vars.PY_LIB_AUTOMATION_CLIENT_ID }}
           private-key: ${{ secrets.PY_LIB_AUTOMATION_PRIVATE_KEY }}
           permission-contents: write
-          permission-pull-requests: write
           permission-workflows: write
 
       - name: Create shared package read token
@@ -97,7 +96,6 @@ jobs:
             uv run cz "$@"
           }
 
-          # Get current version before bump
           CURRENT_VERSION=$(cz version --project)
           echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
@@ -219,24 +217,21 @@ jobs:
       - name: Push changes and tags
         if: steps.cz.outputs.bumped == 'true'
         run: |
-          # Use checkout credentials for repository writes, not dependency-read credentials.
           unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
           git push origin main --follow-tags
 
       - name: Create GitHub Release
         if: steps.cz.outputs.bumped == 'true'
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
           tag_name: v${{ steps.cz.outputs.new_version }}
           name: Release v${{ steps.cz.outputs.new_version }}
-          body_path: CHANGELOG.md
+          generate_release_notes: true
           token: ${{ steps.release-write-token.outputs.token }}
 
       - name: Synchronize dev with main
         run: |
           set -euo pipefail
-
-          # Use checkout credentials for repository writes, not dependency-read credentials.
           unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
 
           git fetch origin main
