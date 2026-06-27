@@ -24,7 +24,7 @@ jobs:
     if: "!startsWith(github.event.head_commit.message, 'bump:')"
 
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Create release write token
@@ -34,6 +34,8 @@ jobs:
           client-id: ${{ vars.PY_LIB_AUTOMATION_CLIENT_ID }}
           private-key: ${{ secrets.PY_LIB_AUTOMATION_PRIVATE_KEY }}
           permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
 
       - name: Create shared package read token
         id: app-token
@@ -228,9 +230,7 @@ jobs:
           tag_name: v${{ steps.cz.outputs.new_version }}
           name: Release v${{ steps.cz.outputs.new_version }}
           body_path: CHANGELOG.md
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ steps.release-write-token.outputs.token }}
+          token: ${{ steps.release-write-token.outputs.token }}
 
       - name: Synchronize dev with main
         run: |
