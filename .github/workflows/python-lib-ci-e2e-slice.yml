@@ -88,6 +88,7 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ steps.token-scope.outputs.repositories }}
           permission-contents: read
+          skip-token-revoke: true
 
       - name: Export shared py-lib Git access
         env:
@@ -131,14 +132,37 @@ jobs:
         env:
           PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
         run: |
+          set -euo pipefail
+          read -r -a browsers <<< "${PLAYWRIGHT_BROWSERS}"
+          for browser in "${browsers[@]}"; do
+            case "${browser}" in
+              chromium|firefox|webkit) ;;
+              *) echo "Unsupported Playwright browser: ${browser}" >&2; exit 2 ;;
+            esac
+          done
+          PLAYWRIGHT_BROWSERS="${browsers[*]}"
           if [ "${{ runner.environment }}" = "self-hosted" ]; then
-            uv run playwright install ${PLAYWRIGHT_BROWSERS}
+            install_command="uv run playwright install ${PLAYWRIGHT_BROWSERS}"
           else
-            uv run playwright install --with-deps ${PLAYWRIGHT_BROWSERS}
+            install_command="uv run playwright install --with-deps ${PLAYWRIGHT_BROWSERS}"
           fi
+          read -r -a command <<< "${install_command}"
+          "${command[@]}"
 
       - name: Run hermetic e2e slice
+        env:
+          E2E_PATH: ${{ inputs.e2e-path }}
         run: |
-          uv run pytest "${{ inputs.e2e-path }}" \
+          set -euo pipefail
+          if [[ ! "${E2E_PATH}" =~ ^tests/[A-Za-z0-9_]+/e2e/[A-Za-z0-9_/-]+$ ]] ||
+             [[ "${E2E_PATH}" == *".."* ]]; then
+            echo "Invalid e2e path: ${E2E_PATH}" >&2
+            exit 2
+          fi
+          if [ ! -d "${E2E_PATH}" ]; then
+            echo "Configured e2e path does not exist: ${E2E_PATH}" >&2
+            exit 2
+          fi
+          uv run pytest "${E2E_PATH}" \
             -m "not slow" \
             -q -rs --no-cov
