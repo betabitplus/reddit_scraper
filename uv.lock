@@ -129,7 +129,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
+    { name = "pycparser" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -1353,15 +1353,15 @@ wheels = [
 [[package]]
 name = "py-lib-runtime"
 version = "0.10.3"
-source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-runtime&rev=v0.26.5#073dd1c36ee582b9dc28041018827a6ec6a8b283" }
+source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-runtime&rev=v0.26.6#88f4ee4e9aa021c3dfd6714b3c7efa13cd8f0e54" }
 dependencies = [
     { name = "structlog" },
 ]
 
 [[package]]
 name = "py-lib-tooling"
-version = "0.24.3"
-source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-tooling&rev=v0.26.5#073dd1c36ee582b9dc28041018827a6ec6a8b283" }
+version = "0.24.4"
+source = { git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-tooling&rev=v0.26.6#88f4ee4e9aa021c3dfd6714b3c7efa13cd8f0e54" }
 dependencies = [
     { name = "copier" },
     { name = "ipython" },
@@ -1818,7 +1818,7 @@ requires-dist = [
     { name = "diskcache", specifier = ">=5.6.3" },
     { name = "fake-useragent" },
     { name = "httpx" },
-    { name = "py-lib-runtime", git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-runtime&rev=v0.26.5" },
+    { name = "py-lib-runtime", git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-runtime&rev=v0.26.6" },
     { name = "tenacity", specifier = ">=9.1.4" },
 ]
 
@@ -1840,7 +1840,7 @@ dev = [
     { name = "pillow", specifier = ">=12.2" },
     { name = "pip-audit", specifier = ">=2.10.1" },
     { name = "pre-commit", specifier = ">=4.6.0" },
-    { name = "py-lib-tooling", git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-tooling&rev=v0.26.5" },
+    { name = "py-lib-tooling", git = "https://github.com/betabitplus/py-lib-starter.git?subdirectory=packages%2Fpy-lib-tooling&rev=v0.26.6" },
     { name = "pyright", specifier = ">=1.1.410" },
     { name = "pytest", specifier = ">=9.1.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },

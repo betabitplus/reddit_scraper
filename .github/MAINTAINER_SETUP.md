@@ -46,10 +46,10 @@ scripts/platform/onboard_github_app_repository.sh \
     "$HOME/.config/py-lib-platform/github-app.pem"
 ```
 
-The authoritative fleet runbook is:
+The authoritative fleet policy is:
 
 ```text
-https://github.com/betabitplus/py-lib-starter/blob/dev/docs/platform-ops/github-app-automation-guide.md
+https://github.com/betabitplus/py-lib-starter/blob/dev/docs/platform-ops/github-app-automation-policy.md
 ```
 
 ## 3. Store App credentials
@@ -103,4 +103,4 @@ Do not require implementation-job names separately.
 
 For missing credentials, malformed keys, missing installation access, workflow
 permission failures, ruleset rejection, key rotation, or repository transfer,
-follow the authoritative fleet runbook above.
+follow the authoritative fleet policy above.
