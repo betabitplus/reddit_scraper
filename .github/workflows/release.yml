@@ -2,8 +2,8 @@
 # Uses Commitizen to analyze conventional commits and determine version bump.
 #
 # Trigger: Push to main (typically via merged PR)
-# Actions: Bump version, update CHANGELOG.md, create a git tag and GitHub Release,
-# then synchronize dev with the final main commit.
+# Actions: Create one bump commit and tag, then use the bump-triggered run to
+# reconcile the GitHub Release and synchronize dev with final main.
 
 name: Release
 
@@ -19,10 +19,7 @@ concurrency:
 jobs:
   bump-version:
     name: Bump version and create release
-    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["self-hosted","linux","arm64"]') }}
-    # Skip if commit message already contains version bump (avoid infinite loop)
-    if: "!startsWith(github.event.head_commit.message, 'bump:')"
-
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     permissions:
       contents: read
 
@@ -70,6 +67,7 @@ jobs:
           shared-package-token: ${{ steps.app-token.outputs.token }}
 
       - name: Validate main commit subject
+        if: "!startsWith(github.event.head_commit.message, 'bump:')"
         run: |
           set -euo pipefail
           main_subject="$(git log -1 --format=%s)"
@@ -88,6 +86,7 @@ jobs:
           git config --local user.email "${app_user_id}+${app_slug}[bot]@users.noreply.github.com"
 
       - name: Bump version and update changelog
+        if: "!startsWith(github.event.head_commit.message, 'bump:')"
         id: cz
         run: |
           set -euo pipefail
@@ -218,18 +217,66 @@ jobs:
         if: steps.cz.outputs.bumped == 'true'
         run: |
           unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
-          git push origin main --follow-tags
+          git push --atomic origin main --follow-tags
+
+      - name: Recover release metadata
+        id: recover
+        if: startsWith(github.event.head_commit.message, 'bump:')
+        run: |
+          set -euo pipefail
+          release_commit="$(git rev-parse HEAD)"
+          version="$(uv run cz version --project)"
+          tag="v${version}"
+          if [ "$(git rev-list -n 1 "$tag" 2>/dev/null || true)" != "$release_commit" ]; then
+            echo "Release tag ${tag} does not point to ${release_commit}." >&2
+            exit 1
+          fi
+          {
+            echo "bumped=true"
+            echo "new_version=$version"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prepare release notes
+        if: steps.recover.outputs.bumped == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.recover.outputs.new_version }}
+        run: |
+          python3 <<'PY'
+          import os
+          from pathlib import Path
+
+          version = os.environ["RELEASE_VERSION"]
+          lines = Path("CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+          heading = f"## v{version}"
+          try:
+              start = next(
+                  i
+                  for i, line in enumerate(lines)
+                  if line == heading or line.startswith(f"{heading} (")
+              )
+          except StopIteration as exc:
+              raise SystemExit(f"Missing changelog section for v{version}") from exc
+          end = next(
+              (i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")),
+              len(lines),
+          )
+          Path("release-notes.md").write_text(
+              "\n".join(lines[start:end]).rstrip() + "\n",
+              encoding="utf-8",
+          )
+          PY
 
       - name: Create GitHub Release
-        if: steps.cz.outputs.bumped == 'true'
+        if: steps.recover.outputs.bumped == 'true'
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
-          tag_name: v${{ steps.cz.outputs.new_version }}
-          name: Release v${{ steps.cz.outputs.new_version }}
-          generate_release_notes: true
+          tag_name: v${{ steps.recover.outputs.new_version }}
+          name: Release v${{ steps.recover.outputs.new_version }}
+          body_path: release-notes.md
           token: ${{ steps.release-write-token.outputs.token }}
 
       - name: Synchronize dev with main
+        if: startsWith(github.event.head_commit.message, 'bump:') || steps.cz.outputs.bumped != 'true'
         run: |
           set -euo pipefail
           unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0

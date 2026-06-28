@@ -20,7 +20,7 @@ env:
 jobs:
   baseline:
     name: Baseline Repo Verification
-    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["self-hosted","linux","arm64"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     permissions:
       contents: read
 
@@ -69,24 +69,17 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: ${{ steps.token-scope.outputs.repositories }}
           permission-contents: read
-          skip-token-revoke: true
 
-      - name: Export shared py-lib Git access
+      - name: Verify shared py-lib Git access
         env:
           SHARED_PACKAGE_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
           auth_header="$(printf 'x-access-token:%s' "${SHARED_PACKAGE_TOKEN}" | base64 | tr -d '\n')"
           printf '::add-mask::%s\n' "${auth_header}"
-          {
-            printf 'GIT_CONFIG_COUNT=1\n'
-            printf 'GIT_CONFIG_KEY_0=http.https://github.com/.extraheader\n'
-            printf 'GIT_CONFIG_VALUE_0=AUTHORIZATION: basic %s\n' "${auth_header}"
-          } >> "${GITHUB_ENV}"
-
-      - name: Verify shared py-lib Git access
-        run: |
-          set -euo pipefail
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth_header}"
           for repository in "${GITHUB_REPOSITORY}" "betabitplus/py-lib-starter"; do
             if ! git ls-remote "https://github.com/${repository}.git" HEAD >/dev/null 2>&1; then
               echo "::error::The betabitplus-py-lib-automation GitHub App cannot read ${repository}. Install or re-authorize the App for that repository before dependency installation."
@@ -95,7 +88,15 @@ jobs:
           done
 
       - name: Install dependencies (dev)
+        env:
+          SHARED_PACKAGE_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          set -euo pipefail
+          auth_header="$(printf 'x-access-token:%s' "${SHARED_PACKAGE_TOKEN}" | base64 | tr -d '\n')"
+          printf '::add-mask::%s\n' "${auth_header}"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth_header}"
           python_path="$(command -v python)"
           uv sync --group dev --frozen --python "${python_path}"
 
@@ -135,7 +136,7 @@ jobs:
           hadolint --version
 
       - name: Cache pre-commit hooks
-        if: ${{ !contains(fromJSON(vars.CI_RUNNER_LABELS_JSON || '["self-hosted","linux","arm64"]'), 'self-hosted') }}
+        if: ${{ !contains(fromJSON(vars.CI_RUNNER_LABELS_JSON || '["ubuntu-latest"]'), 'self-hosted') }}
         uses: actions/cache@v5
         with:
           path: ~/.cache/pre-commit

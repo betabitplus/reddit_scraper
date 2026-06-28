@@ -2,7 +2,7 @@
 # Thin generated orchestration over reusable starter-owned CI workflows.
 # Set CI_RUNNER_LABELS_JSON on the generated repo or organization to switch
 # between local self-hosted Linux runners and GitHub-hosted runners. Default is
-# ["self-hosted","linux","arm64"].
+# ["ubuntu-latest"].
 
 name: CI
 
@@ -68,7 +68,7 @@ jobs:
 
   merge-gate:
     name: ci/merge-gate
-    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["self-hosted","linux","arm64"]') }}
+    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
     needs:
       - baseline
       - package
