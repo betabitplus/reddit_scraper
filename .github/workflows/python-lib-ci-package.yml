@@ -17,7 +17,7 @@ env:
 jobs:
   package:
     name: Package Verification
-    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    runs-on: ${{ github.event.repository.private == true && fromJSON(vars.CI_RUNNER_LABELS_JSON || '["ubuntu-latest"]') || 'ubuntu-latest' }}
     permissions:
       contents: read
 
