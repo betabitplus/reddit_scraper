@@ -1,10 +1,12 @@
 # Changelog
 
-## 0.1.0
+## v0.2.5 (2026-06-21)
 
-- Establish Reddit scraper library package with the standard py-lib repo structure.
-- Add public search, feed, post, user, cache, retry, and media behavior slices.
-- Add hermetic VCR/snapshot-backed e2e verification.
+### Fix
+
+- use cleaned starter workflow sources
+- use cleaned starter template ref
+- pin cleaned starter baseline
 
 ## v0.2.4 (2026-06-19)
 
@@ -45,3 +47,9 @@
 - align config lifecycle organization
 - prune synthetic workbench probes
 - align reddit scraper with library rules
+
+## 0.1.0
+
+- Establish Reddit scraper library package with the standard py-lib repo structure.
+- Add public search, feed, post, user, cache, retry, and media behavior slices.
+- Add hermetic VCR/snapshot-backed e2e verification.
