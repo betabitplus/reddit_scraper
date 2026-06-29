@@ -73,8 +73,8 @@ jobs:
           SHARED_PACKAGE_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
-          auth_header="$(printf 'x-access-token:%s' "${SHARED_PACKAGE_TOKEN}" | base64 | tr -d '\n\')"
-          printf '::add-mask::%s\n\' "${auth_header}"
+          auth_header="$(printf 'x-access-token:%s' "${SHARED_PACKAGE_TOKEN}" | base64 | tr -d '\n')"
+          printf '::add-mask::%s\n' "${auth_header}"
           for repository in "${GITHUB_REPOSITORY}" "betabitplus/py-lib-starter"; do
             GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
@@ -89,8 +89,8 @@ jobs:
           set -euo pipefail
           python_path="$(command -v python)"
           if [ -n "${SHARED_PACKAGE_TOKEN}" ]; then
-            auth_header="$(printf 'x-access-token:%s' "${SHARED_PACKAGE_TOKEN}" | base64 | tr -d '\n\')"
-            printf '::add-mask::*s\n' "${auth_header}"
+            auth_header="$(printf 'x-access-token:%s' "${SHARED_PACKAGE_TOKEN}" | base64 | tr -d '\n')"
+            printf '::add-mask::%s\n' "${auth_header}"
             GIT_CONFIG_COUNT=1 \
             GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
             GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth_header}" \
