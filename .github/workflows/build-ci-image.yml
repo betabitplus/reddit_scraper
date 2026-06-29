@@ -1,12 +1,13 @@
 # Build and push CI Docker image to GitHub Container Registry
-# MANUAL ONLY - GitHub runners lack disk space for full build
-# Build locally: docker build -f .devcontainer/Dockerfile.ci -t ghcr.io/betabitplus/reddit-scraper-ci:latest .
-# Push locally: docker push ghcr.io/betabitplus/reddit-scraper-ci:latest
+# MANUAL ONLY - Docker builds stay off the ordinary local runner fleet.
+# Build locally if the disposable GitHub runner lacks disk space:
+# docker build -f .devcontainer/Dockerfile.ci -t ghcr.io/betabitplus/reddit-scraper-ci:latest .
+# docker push ghcr.io/betabitplus/reddit-scraper-ci:latest
 
 name: Build CI Image
 
 on:
-  workflow_dispatch: # Manual trigger only (build locally due to disk limits)
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -15,7 +16,7 @@ env:
 jobs:
   build:
     name: Build and push CI image
-    runs-on: ${{ fromJSON(vars.CI_RUNNER_LABELS_JSON || '["ubuntu-latest"]') }}
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
