@@ -38,23 +38,17 @@ runs:
           sudo apt-get install -y "${missing[@]}"
         fi
 
-    - name: Export shared py-lib Git access
+    - name: Install dependencies (dev)
       shell: bash
       env:
         SHARED_PACKAGE_TOKEN: ${{ inputs.shared-package-token }}
       run: |
+        set -euo pipefail
+        python_path="$(command -v python)"
         if [ -n "${SHARED_PACKAGE_TOKEN}" ]; then
           auth_header="$(printf 'x-access-token:%s' "${SHARED_PACKAGE_TOKEN}" | base64 | tr -d '\n')"
           printf '::add-mask::%s\n' "${auth_header}"
-          {
-            printf 'GIT_CONFIG_COUNT=1\n'
-            printf 'GIT_CONFIG_KEY_0=http.https://github.com/.extraheader\n'
-            printf 'GIT_CONFIG_VALUE_0=AUTHORIZATION: basic %s\n' "${auth_header}"
-          } >> "${GITHUB_ENV}"
+          GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth_header}" uv sync --group dev --frozen --python "${python_path}"
+        else
+          uv sync --group dev --frozen --python "${python_path}"
         fi
-
-    - name: Install dependencies (dev)
-      shell: bash
-      run: |
-        python_path="$(command -v python)"
-        uv sync --group dev --frozen --python "${python_path}"

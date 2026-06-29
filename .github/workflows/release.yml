@@ -50,14 +50,14 @@ jobs:
         run: |
           set -euo pipefail
           if ! gh api "repos/${REQUIRED_REPOSITORY}" >/dev/null; then
-            echo "::error::The betabitplus-py-lib-automation GitHub App cannot access ${REQUIRED_REPOSITORY}. Install or re-authorize the App for this repository."
+            echo "::error::The automation App cannot access ${REQUIRED_REPOSITORY}."
             exit 1
           fi
 
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0 # Full history for changelog generation
+          fetch-depth: 0
           token: ${{ steps.release-write-token.outputs.token }}
 
       - name: Set up dev environment
@@ -95,15 +95,14 @@ jobs:
             uv run cz "$@"
           }
 
-          CURRENT_VERSION=$(cz version --project)
-          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+          CURRENT_VERSION="$(cz version --project)"
+          echo "current_version=${CURRENT_VERSION}" >> "${GITHUB_OUTPUT}"
 
           set +e
-          DRY_RUN_OUTPUT=$(cz bump --changelog --dry-run --yes 2>&1)
+          DRY_RUN_OUTPUT="$(cz bump --changelog --dry-run --yes 2>&1)"
           DRY_RUN_STATUS=$?
           set -e
-
-          printf '%s\n' "$DRY_RUN_OUTPUT"
+          printf '%s\n' "${DRY_RUN_OUTPUT}"
 
           initial_release_without_prior_tag() {
             local status="$1"
@@ -112,53 +111,51 @@ jobs:
             if [ "$status" -ne 16 ]; then
               return 1
             fi
-            if ! grep -q '^tag to create:' <<<"$output"; then
-              return 1
-            fi
-            if ! grep -q '^No tag found to do an incremental changelog$' <<<"$output"; then
-              return 1
-            fi
-
-            return 0
+            grep -q '^tag to create:' <<<"$output" &&
+              grep -q '^No tag found to do an incremental changelog$' <<<"$output"
           }
 
-          bump_without_changelog_update() {
-            python3 <<'PY'
+          set_changelog_bump_setting() {
+            local old_value="$1"
+            local new_value="$2"
+            OLD_VALUE="${old_value}" NEW_VALUE="${new_value}" python3 <<'PY'
           from pathlib import Path
+          import os
 
           path = Path("pyproject.toml")
           text = path.read_text(encoding="utf-8")
-          old = "update_changelog_on_bump = true"
+          old = f"update_changelog_on_bump = {os.environ['OLD_VALUE']}"
+          new = f"update_changelog_on_bump = {os.environ['NEW_VALUE']}"
           if old not in text:
-              raise SystemExit("Missing Commitizen changelog setting")
-          path.write_text(
-              text.replace(old, "update_changelog_on_bump = false", 1),
-              encoding="utf-8",
-          )
+              raise SystemExit(f"Missing Commitizen setting: {old}")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
           PY
+          }
+
+          bump_without_changelog_update() {
+            local output="$1"
+            local tag_name
+            local bump_status
+
+            tag_name="$(sed -n 's/^tag to create: //p' <<<"$output" | head -n 1)"
+            [ -n "${tag_name}" ] || return 1
+
+            # Commitizen cannot produce an incremental changelog before the
+            # first tag, so create the release section explicitly first.
+            cz changelog --unreleased-version="${tag_name}"
+            set_changelog_bump_setting true false
 
             set +e
             cz bump --yes
             bump_status=$?
             set -e
 
-            python3 <<'PY'
-          from pathlib import Path
-
-          path = Path("pyproject.toml")
-          text = path.read_text(encoding="utf-8")
-          old = "update_changelog_on_bump = false"
-          if old not in text:
-              raise SystemExit("Missing temporary Commitizen changelog setting")
-          path.write_text(
-              text.replace(old, "update_changelog_on_bump = true", 1),
-              encoding="utf-8",
-          )
-          PY
-
+            set_changelog_bump_setting false true
             if [ "$bump_status" -eq 0 ]; then
-              tag_name="v$(cz version --project)"
-              git add pyproject.toml uv.lock
+              actual_tag="v$(cz version --project)"
+              [ "${actual_tag}" = "${tag_name}" ] || return 1
+              grep -Eq "^## ${tag_name}( |$)" CHANGELOG.md
+              git add CHANGELOG.md pyproject.toml uv.lock
               git commit --amend --no-edit
               git tag -d "$tag_name"
               git tag -a "$tag_name" -m "$tag_name"
@@ -167,33 +164,31 @@ jobs:
             return "$bump_status"
           }
 
-          if [ "$DRY_RUN_STATUS" -eq 0 ]; then
+          if [ "${DRY_RUN_STATUS}" -eq 0 ]; then
             cz bump --changelog --yes
-            NEW_VERSION=$(cz version --project)
-            echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-            echo "bumped=true" >> "$GITHUB_OUTPUT"
+            NEW_VERSION="$(cz version --project)"
+            echo "new_version=${NEW_VERSION}" >> "${GITHUB_OUTPUT}"
+            echo "bumped=true" >> "${GITHUB_OUTPUT}"
           elif initial_release_without_prior_tag "$DRY_RUN_STATUS" "$DRY_RUN_OUTPUT"; then
-            bump_without_changelog_update
-            NEW_VERSION=$(cz version --project)
-            echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-            echo "bumped=true" >> "$GITHUB_OUTPUT"
-          elif [ "$DRY_RUN_STATUS" -eq 3 ] || [ "$DRY_RUN_STATUS" -eq 21 ]; then
-            echo "No version bump needed (no feat/fix commits since last release)"
-            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            bump_without_changelog_update "$DRY_RUN_OUTPUT"
+            NEW_VERSION="$(cz version --project)"
+            echo "new_version=${NEW_VERSION}" >> "${GITHUB_OUTPUT}"
+            echo "bumped=true" >> "${GITHUB_OUTPUT}"
+          elif [ "${DRY_RUN_STATUS}" -eq 3 ] || [ "${DRY_RUN_STATUS}" -eq 21 ]; then
+            echo "No version bump needed."
+            echo "bumped=false" >> "${GITHUB_OUTPUT}"
           else
-            echo "Commitizen bump dry-run failed with exit code $DRY_RUN_STATUS" >&2
-            exit "$DRY_RUN_STATUS"
+            exit "${DRY_RUN_STATUS}"
           fi
 
       - name: Validate release bump scope
         if: steps.cz.outputs.bumped == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.cz.outputs.new_version }}
         run: |
           set -euo pipefail
-
           git diff --check HEAD^ HEAD
-          if ! git diff --quiet; then
-            git diff --check
-          fi
+          grep -Eq "^## v${RELEASE_VERSION}( |$)" CHANGELOG.md
 
           changed_files="$(
             {
@@ -202,22 +197,19 @@ jobs:
             } | sort -u
           )"
           while IFS= read -r path; do
-            [ -n "$path" ] || continue
-            case "$path" in
+            [ -n "${path}" ] || continue
+            case "${path}" in
               CHANGELOG.md|pyproject.toml|uv.lock) ;;
               *)
-                echo "Release bump modified unapproved path: $path" >&2
-                echo "Only CHANGELOG.md, pyproject.toml, and uv.lock may change during generated release bumps." >&2
+                echo "Release bump modified unapproved path: ${path}" >&2
                 exit 1
                 ;;
             esac
-          done <<< "$changed_files"
+          done <<< "${changed_files}"
 
       - name: Push changes and tags
         if: steps.cz.outputs.bumped == 'true'
-        run: |
-          unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
-          git push --atomic origin main --follow-tags
+        run: git push --atomic origin main --follow-tags
 
       - name: Recover release metadata
         id: recover
@@ -227,14 +219,14 @@ jobs:
           release_commit="$(git rev-parse HEAD)"
           version="$(uv run cz version --project)"
           tag="v${version}"
-          if [ "$(git rev-list -n 1 "$tag" 2>/dev/null || true)" != "$release_commit" ]; then
+          if [ "$(git rev-list -n 1 "${tag}" 2>/dev/null || true)" != "${release_commit}" ]; then
             echo "Release tag ${tag} does not point to ${release_commit}." >&2
             exit 1
           fi
           {
             echo "bumped=true"
-            echo "new_version=$version"
-          } >> "$GITHUB_OUTPUT"
+            echo "new_version=${version}"
+          } >> "${GITHUB_OUTPUT}"
 
       - name: Prepare release notes
         if: steps.recover.outputs.bumped == 'true'
@@ -250,14 +242,14 @@ jobs:
           heading = f"## v{version}"
           try:
               start = next(
-                  i
-                  for i, line in enumerate(lines)
+                  index
+                  for index, line in enumerate(lines)
                   if line == heading or line.startswith(f"{heading} (")
               )
           except StopIteration as exc:
               raise SystemExit(f"Missing changelog section for v{version}") from exc
           end = next(
-              (i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")),
+              (index for index in range(start + 1, len(lines)) if lines[index].startswith("## ")),
               len(lines),
           )
           Path("release-notes.md").write_text(
@@ -279,50 +271,42 @@ jobs:
         if: startsWith(github.event.head_commit.message, 'bump:') || steps.cz.outputs.bumped != 'true'
         run: |
           set -euo pipefail
-          unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
-
           git fetch origin main
           main_sha="$(git rev-parse origin/main)"
 
-          if git ls-remote --exit-code --heads origin dev >/dev/null; then
-            git fetch origin dev
-            dev_sha="$(git rev-parse origin/dev)"
+          if ! git ls-remote --exit-code --heads origin dev >/dev/null; then
+            git push origin "${main_sha}:refs/heads/dev"
+            exit 0
+          fi
 
-            if [ "${dev_sha}" = "${main_sha}" ]; then
-              echo "origin/dev already matches origin/main."
-              exit 0
-            fi
+          git fetch origin dev
+          dev_sha="$(git rev-parse origin/dev)"
+          [ "${dev_sha}" = "${main_sha}" ] && exit 0
 
-            if git merge-base --is-ancestor "${dev_sha}" "${main_sha}"; then
-              git push origin "${main_sha}:refs/heads/dev"
-              exit 0
-            fi
+          if git merge-base --is-ancestor "${dev_sha}" "${main_sha}"; then
+            git push origin "${main_sha}:refs/heads/dev"
+            exit 0
+          fi
 
-            represented_main_sha="${main_sha}"
-            main_subject="$(git log -1 --format=%s "${main_sha}")"
-            if [ "${main_subject#bump:}" != "${main_subject}" ]; then
-              represented_main_sha="${main_sha}^"
-            fi
+          represented_main_sha="${main_sha}"
+          main_subject="$(git log -1 --format=%s "${main_sha}")"
+          if [ "${main_subject#bump:}" != "${main_subject}" ]; then
+            represented_main_sha="${main_sha}^"
+          fi
 
-            if [ "$(git rev-parse "${represented_main_sha}^{tree}")" = "$(git rev-parse "${dev_sha}^{tree}")" ]; then
-              echo "origin/dev tree matches ${represented_main_sha}; moving dev to final main with an exact lease."
-              git push origin "${main_sha}:refs/heads/dev" \
-                --force-with-lease="refs/heads/dev:${dev_sha}"
-              exit 0
-            fi
-
-            dev_unique_commits="$(
-              git log --right-only --cherry-pick --oneline "${main_sha}...${dev_sha}"
-            )"
-            if [ -n "${dev_unique_commits}" ]; then
-              echo "origin/dev contains commits not represented on origin/main; refusing to move dev." >&2
-              printf '%s\n' "${dev_unique_commits}" >&2
-              exit 1
-            fi
-
-            echo "origin/dev contains only patch-equivalent rebased commits; moving dev to main with an exact lease."
+          if [ "$(git rev-parse "${represented_main_sha}^{tree}")" = "$(git rev-parse "${dev_sha}^{tree}")" ]; then
             git push origin "${main_sha}:refs/heads/dev" \
               --force-with-lease="refs/heads/dev:${dev_sha}"
-          else
-            git push origin "${main_sha}:refs/heads/dev"
+            exit 0
           fi
+
+          dev_unique_commits="$(
+            git log --right-only --cherry-pick --oneline "${main_sha}...${dev_sha}"
+          )"
+          if [ -n "${dev_unique_commits}" ]; then
+            printf '%s\n' "${dev_unique_commits}" >&2
+            exit 1
+          fi
+
+          git push origin "${main_sha}:refs/heads/dev" \
+            --force-with-lease="refs/heads/dev:${dev_sha}"
