@@ -115,17 +115,19 @@ jobs:
               grep -q '^No tag found to do an incremental changelog$' <<<"$output"
           }
 
-          set_changelog_bump_setting() {
-            local old_value="$1"
-            local new_value="$2"
-            OLD_VALUE="${old_value}" NEW_VALUE="${new_value}" python3 <<'PY'
+          set_commitizen_bool_setting() {
+            local setting="$1"
+            local old_value="$2"
+            local new_value="$3"
+            SETTING="${setting}" OLD_VALUE="${old_value}" NEW_VALUE="${new_value}" python3 <<'PY'
           from pathlib import Path
           import os
 
           path = Path("pyproject.toml")
           text = path.read_text(encoding="utf-8")
-          old = f"update_changelog_on_bump = {os.environ['OLD_VALUE']}"
-          new = f"update_changelog_on_bump = {os.environ['NEW_VALUE']}"
+          key = os.environ["SETTING"]
+          old = f"{key} = {os.environ['OLD_VALUE']}"
+          new = f"{key} = {os.environ['NEW_VALUE']}"
           if old not in text:
               raise SystemExit(f"Missing Commitizen setting: {old}")
           path.write_text(text.replace(old, new, 1), encoding="utf-8")
@@ -141,16 +143,18 @@ jobs:
             [ -n "${tag_name}" ] || return 1
 
             # Commitizen cannot produce an incremental changelog before the
-            # first tag, so create the release section explicitly first.
+            # first tag, so create the release section non-incrementally first.
+            set_commitizen_bool_setting changelog_incremental true false
             cz changelog --unreleased-version="${tag_name}"
-            set_changelog_bump_setting true false
+            set_commitizen_bool_setting changelog_incremental false true
+            set_commitizen_bool_setting update_changelog_on_bump true false
 
             set +e
             cz bump --yes
             bump_status=$?
             set -e
 
-            set_changelog_bump_setting false true
+            set_commitizen_bool_setting update_changelog_on_bump false true
             if [ "$bump_status" -eq 0 ]; then
               actual_tag="v$(cz version --project)"
               [ "${actual_tag}" = "${tag_name}" ] || return 1
@@ -304,6 +308,7 @@ jobs:
             git log --right-only --cherry-pick --oneline "${main_sha}...${dev_sha}"
           )"
           if [ -n "${dev_unique_commits}" ]; then
+            echo "origin/dev contains commits not represented on origin/main:" >&2
             printf '%s\n' "${dev_unique_commits}" >&2
             exit 1
           fi
