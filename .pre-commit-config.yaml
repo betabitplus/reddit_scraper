@@ -98,7 +98,7 @@ repos:
       # Enforce Git Flow naming conventions (feature/, fix/, etc.)
       - id: check-branch-name
         name: check branch naming convention
-        entry: bash -c 'branch=$(git rev-parse --abbrev-ref HEAD); if ! echo "$branch" | grep -qE "^(feature|fix|chore|hotfix|release|codex|dev|main)/|^(dev|main)$"; then echo "❌ Branch name must start with feature/, fix/, chore/, hotfix/, release/, or codex/"; exit 1; fi'
+        entry: bash -c 'branch=$(git symbolic-ref --quiet --short HEAD || git rev-parse --abbrev-ref HEAD); if ! echo "$branch" | grep -qE "^(feature|fix|chore|hotfix|release|codex|dev|main)/|^(dev|main)$"; then echo "❌ Branch name must start with feature/, fix/, chore/, hotfix/, release/, or codex/"; exit 1; fi'
         language: system
         pass_filenames: false
         always_run: true
