@@ -90,7 +90,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
           ref: dev
           token: ${{ steps.sync-write-token.outputs.token }}
 
@@ -137,7 +137,7 @@ jobs:
           echo "starter_ref=${starter_ref:-latest}" >> "$GITHUB_OUTPUT"
           echo "sync_label=${sync_label}" >> "$GITHUB_OUTPUT"
 
-          tooling_source="py-lib-tooling @ git+https://github.com/betabitplus/py-lib-starter.git@${starter_ref:-v0.28.10}#subdirectory=packages/py-lib-tooling"
+          tooling_source="py-lib-tooling @ git+https://github.com/betabitplus/py-lib-starter.git@${starter_ref:-v0.28.11}#subdirectory=packages/py-lib-tooling"
 
           run_tooling_command() {
             local command_name="$1"
